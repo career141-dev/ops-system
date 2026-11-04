@@ -10,6 +10,7 @@ import {
   positionIn,
   requirementIn,
 } from "@/data/desk";
+import { depthInWords } from "@/lib/depth";
 import { REQUIREMENT_FIELDS, STAGE_MEANINGS, type PositionStage, briefText, handoverInWords } from "@/lib/requirements";
 import { can } from "@/lib/roles";
 import { currentMember } from "@/lib/session";
@@ -137,6 +138,24 @@ export default async function PositionPage({
             <button className={plain}>Record it</button>
           </form>
         )}
+      </section>
+
+      <section className={card}>
+        <h2 className="text-[14.5px] font-medium">How deep the client&rsquo;s shortlist is</h2>
+        <p className="mt-1 text-[13px]">{depthInWords(position)}</p>
+        {position.depthCheckedAt && (
+          <p className="mt-1 text-[12px] text-ink-faint">Counted {whenLocal(position.depthCheckedAt)}, from TA&rsquo;s own pipeline.</p>
+        )}
+        {position.depthStage === "hold_at_five" && (
+          <p className="mt-2 text-[12.5px]">
+            No more CVs go to this client until they interview some of the five. Only the ops lead can send a set
+            anyway.
+          </p>
+        )}
+        <p className="mt-2 text-[12px] text-ink-faint">
+          It is counted after every client decision and every stage move the TA System tells us about, so nobody has
+          to keep a tally.
+        </p>
       </section>
 
       <section className={card}>

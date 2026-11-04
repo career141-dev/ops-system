@@ -40,6 +40,20 @@ export function gate(message: Pick<OpsMessage, "to" | "channel" | "state">, ctx:
   }
 
   const recipients = message.to.map((t) => t.trim()).filter(Boolean);
+
+  // A group post has no address and nothing sends it: a person posts it from
+  // their phone. Approving it must not be a failure because the group has no
+  // name yet - which is exactly what it looked like in the browser (3 Nov).
+  if (message.channel === "group_post") {
+    return {
+      ok: true,
+      to: recipients,
+      note: recipients.length
+        ? "Yours to post in " + recipients.join(", ") + "."
+        : "Yours to post. The group's name is not written down yet.",
+    };
+  }
+
   if (!recipients.length) {
     return { ok: false, state: "failed", note: "There is nobody to send this to." };
   }
@@ -83,4 +97,32 @@ export function fillTemplate(body: string, values: Record<string, string>): { te
     return value;
   });
   return { text, missing };
+}
+
+/**
+ * Who a message is for, in words a reader understands.
+ *
+ * A group post has no subject and no address - no system can post to a
+ * WhatsApp group - so the lists were showing "group_post to " and nothing
+ * else (found in the browser, 3 Nov). This says what it really is.
+ */
+export function messageInWords(message: { channel: string; to: string[] }): string {
+  const who = message.to.filter((t) => t.trim()).join(", ");
+  if (message.channel === "email") return "Email to " + (who || "nobody yet");
+  if (message.channel === "whatsapp") return "WhatsApp to " + (who || "nobody yet");
+  if (message.channel === "group_post") {
+    return who
+      ? "To post by hand in the WhatsApp group " + who
+      : "To post by hand in the client's WhatsApp group, which is not made yet";
+  }
+  if (message.channel === "internal") return "A notice to our own people" + (who ? ": " + who : "");
+  return message.channel + (who ? " to " + who : "");
+}
+
+/** The line a list shows for a message: its subject, or its opening words. */
+export function messageTitle(message: { subject: string; body: string }): string {
+  const subject = message.subject.trim();
+  if (subject) return subject;
+  const first = message.body.split("\n").find((line) => line.trim()) ?? "";
+  return first.trim() || "No subject";
 }

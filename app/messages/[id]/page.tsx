@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { desk, fileIn } from "@/data/desk";
 import { currentMember } from "@/lib/session";
+import { messageInWords } from "@/lib/messages";
 import { approveAndSend, recordReply, saveDraft } from "@/app/actions";
 
 /** One message, on its own page. Read it, change it, approve it. */
@@ -34,7 +35,7 @@ export default async function MessagePage({
       </Link>
       <h1 className="mt-2 text-[17px] font-medium">{message.templateKey ?? "Message"}</h1>
       <p className="mt-0.5 text-[13px] text-ink-soft">
-        {message.channel === "email" ? "Email" : message.channel} to {message.to.join(", ")} · {message.state}
+        {messageInWords(message)} · {message.state}
       </p>
 
       {msg && (
@@ -59,10 +60,12 @@ export default async function MessagePage({
       {message.state === "draft" ? (
         <form action={saveDraft} className="mt-4 flex flex-col gap-3">
           <input type="hidden" name="messageId" value={message.id} />
-          <label className="block">
-            <span className="mb-1 block text-[12px] text-ink-soft">Subject</span>
-            <input name="subject" defaultValue={message.subject} className={input} />
-          </label>
+          {message.channel !== "group_post" && (
+            <label className="block">
+              <span className="mb-1 block text-[12px] text-ink-soft">Subject</span>
+              <input name="subject" defaultValue={message.subject} className={input} />
+            </label>
+          )}
           <label className="block">
             <span className="mb-1 block text-[12px] text-ink-soft">Message</span>
             <textarea name="body" defaultValue={message.body} rows={10} className={input} />
@@ -101,11 +104,12 @@ export default async function MessagePage({
         <form action={approveAndSend} className="mt-4 border-t border-rule pt-4">
           <input type="hidden" name="messageId" value={message.id} />
           <p className="text-[13px] text-ink-soft">
-            Approving sends it. While the system is in test mode it goes to the test address instead,
-            and the result is written here.
+            {message.channel === "group_post"
+              ? "Nothing can send this: no system can post to a WhatsApp group. Approve it, copy it and post it from your phone - that it is yours to post is written here."
+              : "Approving sends it. While the system is in test mode it goes to the test address instead, and the result is written here."}
           </p>
           <button className="mt-3 rounded-full bg-brand px-4 py-1.5 text-[12.5px] font-medium text-white">
-            Approve and send
+            {message.channel === "group_post" ? "Approve it, and post it myself" : "Approve and send"}
           </button>
         </form>
       )}

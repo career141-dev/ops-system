@@ -224,3 +224,26 @@ disputed in good faith. Same decision: the document.
 The lesson is the ordinary one and it cost nothing this time, because the
 numbers all live in the settings: a rule read off a card is a guess until the
 document that a client signs has been read.
+
+## 3 November 2026 - the group post looked like a failure
+
+Walking the last of phase 4 in the browser found three faults that the tests
+and the types had both passed.
+
+**A group post read as "group_post to ".** The day's list and the message page
+printed the channel name and the address, and a group post has neither a
+subject nor an address. It now says what it is: "To post by hand in the
+client's WhatsApp group, which is not made yet."
+
+**Approving a group post failed it.** The gate refuses a message with nobody
+to send it to, which is right for an email and wrong for a post a person makes
+from their phone. A group post now passes the gate with no address, and
+settles at *approved* rather than *sent*: nothing sent it, and saying "sent"
+about a post nobody has made yet is the kind of small lie a system should not
+tell.
+
+**The depth count read itself after writing itself.** The store hands back the
+same row a patch writes to, so "was it held before?" was asked of a record
+that already said the new answer, and the hold never lifted in TA. The same
+trap as the set that said "short of 5" about a set of exactly five: read the
+old value into a variable before the patch. Both are pinned by tests now.

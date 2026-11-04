@@ -28,6 +28,9 @@ export function seed(now = Date.now()): OpsDatabase {
       { key: "feedback.chaseDays", value: 1, updatedBy: null, updatedAt: null },
       { key: "feedback.stopAfterSilentDays", value: 4, updatedBy: null, updatedAt: null },
       { key: "feedback.callAfterDays", value: 1, updatedBy: null, updatedAt: null },
+      // The owner's two depth rules, as numbers a lead can change (3 Nov).
+      { key: "depth.holdAt", value: 5, updatedBy: null, updatedAt: null },
+      { key: "depth.searchAgainAt", value: 3, updatedBy: null, updatedAt: null },
       { key: "hold.afterDays", value: 14, updatedBy: null, updatedAt: null },
       { key: "hold.reviewDays", value: 30, updatedBy: null, updatedAt: null },
       { key: "invoice.dueDays", value: 30, updatedBy: null, updatedAt: null },

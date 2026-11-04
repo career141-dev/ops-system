@@ -83,3 +83,19 @@ test("a template with a hole left in it reports the hole", () => {
   assert.deepEqual(short.missing, ["tax"]);
   assert.match(short.text, /\{\{tax\}\}/);
 });
+
+test("a group post passes with no address, because a person posts it", () => {
+  // The group may not exist when the first set goes out. Approving the post
+  // must not read as a failure for that (found in the browser, 3 Nov).
+  const post = { to: [] as string[], channel: "group_post" as const, state: "approved" as const };
+  const nameless = gate(post, ctx());
+  assert.equal(nameless.ok, true);
+  assert.match(String(nameless.ok && nameless.note), /not written down yet/);
+
+  const named = gate({ ...post, to: ["Career 141 x Sample Client"] }, ctx());
+  assert(named.ok && named.to[0] === "Career 141 x Sample Client", "not sent to the test address");
+  assert.match(String(named.ok && named.note), /Yours to post/);
+
+  // It still waits for a person, like everything else.
+  assert.equal(gate({ ...post, state: "draft" }, ctx()).ok, false);
+});

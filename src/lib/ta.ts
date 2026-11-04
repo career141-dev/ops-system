@@ -243,6 +243,22 @@ export function clientSets(openingId: string): Promise<TaResult<TaClientSet[]>> 
   return call<TaClientSet[]>("read", "/integrations/v1/openings/" + encodeURIComponent(openingId) + "/client-sets");
 }
 
+/** The opening's pipeline, for the depth rules (15, Phase 4 step 14). */
+export interface TaPipeline {
+  applications: {
+    id: string;
+    candidateName: string;
+    currentStage: string;
+    setNumber: number | null;
+    backupForApplicationId: string | null;
+  }[];
+  counts: Record<string, number>;
+}
+
+export function pipeline(openingId: string): Promise<TaResult<TaPipeline>> {
+  return call<TaPipeline>("read", "/integrations/v1/openings/" + encodeURIComponent(openingId) + "/pipeline");
+}
+
 /** One round, by its number on the opening (15, Phase 4 step 2). */
 export function clientSet(openingId: string, setNumber: number): Promise<TaResult<TaClientSet>> {
   return call<TaClientSet>(

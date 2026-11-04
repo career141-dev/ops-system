@@ -563,6 +563,15 @@ export interface OpsPosition {
    */
   linkedInUrl: string | null;
   linkedInPostedAt: number | null;
+  /**
+   * How deep the client's shortlist is (15, Phase 4 steps 14 and 15). Kept on
+   * the position rather than in a table of its own: only the latest count
+   * decides anything, and every change is already in the audit.
+   */
+  depthStage: string | null;
+  shortlistedTotal: number | null;
+  pendingCount: number | null;
+  depthCheckedAt: number | null;
   handedOverAt: number;
   closedAt: number | null;
   ownerId: Id;

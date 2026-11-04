@@ -892,6 +892,8 @@ TA) so the shape is visible in days rather than weeks, and the rest of Phase 1 f
    (editable); **TA:** `POST client-sets/{id}/sent`; `notify` the TA.
 5. First set for a client with no `whatsappGroupName`: task "create client group" +
    drafted group post (`set.group_post`) → owner ticks posted → `groupCreatedAt`.
+   **Built 3 Nov**: the post is drafted with every set, and settles at *approved*,
+   because nothing can send it and "sent" would be untrue.
 6. Timers at receipt: `set.ownership` (7 working days, warn at 5) and `feedback.chase` (1 day).
 7. `claims.record(setId, appTaId)`: within window → `dropped`: **TA:** `POST client-owned`;
    reply `claim.noted` drafted; after window → `refused`: reply `claim.refused` drafted.
@@ -916,9 +918,12 @@ TA) so the shape is visible in days rather than weeks, and the rest of Phase 1 f
     interviewed); order: `≥5 → on hold, reason "five shortlisted"` (J9: **TA** `POST
     openings/{id}/status on_hold`), else `≤3 pending → add_on` (**TA** `POST working-stage`
     for the primary TA), else `follow_up`; below five again → status `open`; `notify` the TA
-    on every change; `opsDepthChecks` row.
+    on every change; `opsDepthChecks` row. **Built 3 Nov**, with one change: the
+    count lives on the position (`depthStage`, `shortlistedTotal`, `pendingCount`,
+    `depthCheckedAt`) instead of a table of its own - there is one live count per
+    position and the audit already keeps every change of it.
 15. "Hold at five" also sets a position flag so the set sender refuses to send a new set
-    until the count drops (with an override for the ops lead).
+    until the count drops (with an override for the ops lead). **Built 3 Nov.**
 16. Back-up visibility: `backupForApplicationId` shown on the set and interviews; the slot
     loop (P5) uses it.
 17. **TA: T2** (reasons required) and **T5** (min 5, client rejection template) land here.

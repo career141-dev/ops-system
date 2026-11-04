@@ -67,7 +67,7 @@ Still to come in phase 3: **TopJobs** — requested, the flyer, the order, live,
 and closed after two weeks — which the owner paused on 3 Nov because it is the
 one with money in it. Then the weekly report builder.
 
-## Built: phase 4, the first four steps
+## Built: phase 4, the client side of the search
 
 The owner asked for these before phase 3, so they stand on the stand-in TA
 System rather than on an opening Ops created itself.
@@ -89,11 +89,13 @@ System rather than on an opening Ops created itself.
 | What the client decided, in their own words | `recordClientDecision` | a rejection without their words is refused; TA is told so it moves the stage |
 | The silence hold, and lifting it | `proposeTheHold`, `approveTheHold`, `liftTheHold`; screens `app/holds` | proposed by a clock, held only when a person approves the notice, reviewed every thirty days, and never closing by itself |
 
-Still to come in phase 4: the client WhatsApp group post, the depth rules
-("three left means search again", "five shortlisted means hold"), the inbound
-reader that proposes a client's decisions instead of them being typed (that is
-Phase 9 step 8), and the surcharge invoice an unreported hire leads to (the
-invoice engine is Phase 6).
+| The client's WhatsApp group post | `sendClientSet` in `app/actions.ts` | drafted with the set; the first set for a client with no group also leaves the task to make it. Nothing sends it - no system can write to a WhatsApp group - so it stops at *approved*, which is the truth |
+| Three left means search again, five shortlisted means hold | `src/lib/depth.ts`, `evaluateDepth` in `src/data/desk.ts` | counted from TA's own pipeline after every client decision and every stage move TA tells us about; the hold is read first, so a full client is never told to search; below five again opens the opening back up by itself |
+| A held client gets no sixth CV | `problemWithAnotherSet`, used by `sendClientSet` | refused with the reason; the ops lead can override, and the override is written to the audit |
+
+Still to come in phase 4: the inbound reader that proposes a client's decisions
+instead of them being typed (that is Phase 9 step 8), and the surcharge invoice
+an unreported hire leads to (the invoice engine is Phase 6).
 
 ## Not built
 
@@ -144,7 +146,7 @@ Each of these exists because of something that went wrong, written in
 ## How it is checked
 
 ```bash
-node tests/run.mjs        # all 24 suites, each in its own process
+node tests/run.mjs        # all 29 suites, each in its own process
 npx tsc --noEmit          # types
 ```
 

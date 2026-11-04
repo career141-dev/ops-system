@@ -90,6 +90,26 @@ const EVENTS = [
   { id: "ta_ev_4", type: "something.we.do.not.know", at: Date.UTC(2026, 10, 1, 7), data: {} },
 ];
 
+/**
+ * The pipeline of the sample opening (15, Phase 4 step 14).
+ *
+ * Four shortlisted and two of them still waiting to be interviewed, which is
+ * the ordinary middle of a search: not held at five, and not thin enough to
+ * send the TA back out. The depth rules can be walked from here in both
+ * directions by moving one candidate.
+ */
+const PIPELINE = {
+  applications: [
+    { id: "ta_a1", candidateName: "SAMPLE CANDIDATE ONE", currentStage: "client_shortlist", setNumber: 1, backupForApplicationId: null },
+    { id: "ta_a2", candidateName: "SAMPLE CANDIDATE TWO", currentStage: "client_shortlist", setNumber: 1, backupForApplicationId: null },
+    { id: "ta_a3", candidateName: "SAMPLE CANDIDATE THREE", currentStage: "interview", setNumber: 1, backupForApplicationId: null },
+    { id: "ta_a4", candidateName: "SAMPLE CANDIDATE FOUR", currentStage: "offer", setNumber: 1, backupForApplicationId: null },
+    { id: "ta_a5", candidateName: "SAMPLE CANDIDATE FIVE", currentStage: "rejected_by_client", setNumber: 1, backupForApplicationId: null },
+    { id: "ta_a6", candidateName: "SAMPLE CANDIDATE SIX", currentStage: "follow_up", setNumber: null, backupForApplicationId: null },
+  ],
+  counts: { client_shortlist: 2, interview: 1, offer: 1, rejected_by_client: 1, follow_up: 1 },
+};
+
 export type FakeAnswer<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 /**
@@ -138,6 +158,7 @@ export function fakeAnswer<T>(path: string, method = "GET"): FakeAnswer<T> {
     return found ? give(found) : { ok: false, reason: "The stand-in has no set " + n + "." };
   }
   if (where.endsWith("/client-sets")) return give(CLIENT_SETS);
+  if (where.endsWith("/pipeline")) return give(PIPELINE);
   if (where.endsWith("/events")) {
     const after = new URLSearchParams(query ?? "").get("after") ?? "";
     // The cursor is the last event's id, exactly as the real API works.

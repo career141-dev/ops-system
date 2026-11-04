@@ -33,6 +33,13 @@ import { chaseDraft, chaseStep, nextChaseAt } from "@/lib/esa";
 import { dueFromEsa, setName } from "@/lib/clientSets";
 import { nextTuesdayNineAm, weekOf } from "@/lib/adverts";
 import {
+  DEPTH_MEANINGS,
+  HOLD_AT,
+  SEARCH_AGAIN_AT,
+  countDepth,
+  depthVerdict,
+} from "@/lib/depth";
+import {
   HOLD_AFTER_DAYS,
   OWNERSHIP_WORKING_DAYS,
   holdDueAt,
@@ -44,7 +51,13 @@ import { type InboundMail, readAllMailboxes } from "@/lib/graphMail";
 import { matchInbound, stopsChasing } from "@/lib/mailMatch";
 import { dueNow, keyFor as outboxKeyFor, nextTryAt, shouldGiveUp } from "@/lib/outbox";
 import { cursorAfter, whatWeDoWithIt } from "@/lib/taEvents";
-import { clientSet as taClientSet, eventsAfter, opening as taOpening, write as taWrite } from "@/lib/ta";
+import {
+  clientSet as taClientSet,
+  eventsAfter,
+  opening as taOpening,
+  pipeline as taPipeline,
+  write as taWrite,
+} from "@/lib/ta";
 
 /**
  * The desk, from wherever it is kept (2 Nov).
@@ -147,7 +160,9 @@ export async function editMessage(messageId: Id, patch: Pick<OpsMessage, "subjec
 export async function settleMessage(
   messageId: Id,
   by: Id,
-  state: Extract<OpsMessage["state"], "sent" | "failed" | "blocked" | "queued">,
+  // "approved" settles a group post: a person has it to post, and nothing
+  // sent it (3 Nov).
+  state: Extract<OpsMessage["state"], "sent" | "failed" | "blocked" | "queued" | "approved">,
   to: string[],
   note: string | null,
   /** What the mail server called it, once a sender knows. */
@@ -930,6 +945,10 @@ export async function takeOpeningCreated(data: Record<string, unknown>, now = Da
     jdApprovedAt: null,
     linkedInUrl: null,
     linkedInPostedAt: null,
+    depthStage: null,
+    shortlistedTotal: null,
+    pendingCount: null,
+    depthCheckedAt: null,
     handedOverAt: now,
     closedAt: null,
     ownerId: client.ownerId,
@@ -1081,6 +1100,95 @@ export async function compileTalentPulse(by: Id, now = Date.now()): Promise<OpsT
     payload: { label: "Talent Pulse" },
   });
   return issue;
+}
+
+/**
+ * Count the client's shortlist, and decide (15, Phase 4 steps 14 and 15).
+ *
+ * Run after every client decision and every stage move TA tells us about. The
+ * counting is TA's - we read their pipeline rather than keep our own tally,
+ * because two tallies always disagree in the end - and the decision is the
+ * owner's two rules: hold at five, or search again at three.
+ *
+ * It never throws: a pipeline we cannot read leaves the last count standing,
+ * which is better than a wrong one.
+ */
+export async function evaluateDepth(
+  positionId: Id,
+  now = Date.now(),
+): Promise<{ ok: boolean; what: string; stage: string | null }> {
+  const db = await desk();
+  const position = positionIn(db, positionId);
+  if (!position) return { ok: false, what: "That position is gone.", stage: null };
+  if (!position.openingTaId) {
+    return { ok: false, what: "TA has not confirmed the opening yet, so there is no pipeline to count.", stage: null };
+  }
+
+  const answer = await taPipeline(position.openingTaId);
+  if (!answer.ok) return { ok: false, what: "Could not read the pipeline: " + answer.reason, stage: position.depthStage };
+
+  const depth = countDepth(answer.data.applications ?? []);
+  const verdict = depthVerdict(depth, numberOf(db, "depth.holdAt", HOLD_AT), numberOf(db, "depth.searchAgainAt", SEARCH_AGAIN_AT));
+  // Read before the patch: the store hands back the row it keeps, so after a
+  // patch this object already says the new stage (the aliasing trap, 3 Nov).
+  const was = position.depthStage;
+  const changed = was !== verdict.stage;
+
+  await patchPosition(
+    positionId,
+    {
+      depthStage: verdict.stage,
+      shortlistedTotal: depth.shortlistedTotal,
+      pendingCount: depth.pending,
+      depthCheckedAt: now,
+    },
+    null,
+    changed ? "position.depth." + verdict.stage : "position.depthCounted",
+    verdict.because,
+  );
+
+  if (!changed) return { ok: true, what: verdict.because, stage: verdict.stage };
+
+  // TA decides how its own people work, so this is told, never set: the
+  // working stage goes through the API and the TA is belled about it.
+  if (verdict.taWorkingStage) {
+    await queueTaWrite(
+      "/integrations/v1/openings/" + position.openingTaId + "/working-stage",
+      { workingStage: verdict.taWorkingStage, because: verdict.because },
+      { type: "position", id: positionId },
+    );
+  }
+  if (verdict.stage === "hold_at_five") {
+    await queueTaWrite(
+      "/integrations/v1/openings/" + position.openingTaId + "/status",
+      { status: "on_hold", reason: "five shortlisted" },
+      { type: "position", id: positionId },
+    );
+  } else if (was === "hold_at_five") {
+    // Below five again: the hold lifts of its own accord, because the count is
+    // the whole reason it was there (15, Phase 4 step 14).
+    await queueTaWrite(
+      "/integrations/v1/openings/" + position.openingTaId + "/status",
+      { status: "open", reason: "below five shortlisted again" },
+      { type: "position", id: positionId },
+    );
+  }
+  await createTask({
+    kind: "check",
+    title: DEPTH_MEANINGS[verdict.stage] + ": " + position.title,
+    body: verdict.because + "\n\nThe TA System has been told; nothing else to do unless the TA asks something.",
+    assigneeId: position.ownerId,
+    dueAt: now,
+    subjectType: "position",
+    subjectId: positionId,
+    link: "/positions/" + positionId,
+  });
+  return { ok: true, what: verdict.because, stage: verdict.stage };
+}
+
+/** The position behind a set, when TA has confirmed its opening. */
+export function positionForSet(db: OpsDatabase, set: OpsClientSet): OpsPosition | null {
+  return db.positions.find((p) => p.openingTaId === set.openingTaId) ?? null;
 }
 
 /* ── Client sets: what the client is sent (15, Phase 4) ───────── */
@@ -1550,6 +1658,14 @@ export async function readTaEvents(now = Date.now()): Promise<{ read: number; ke
     // TA owns the openings, so Ops learns about them here rather than
     // guessing (15, Phase 3 steps 7 and 8).
     if (event.type === "opening.created") await takeOpeningCreated(event.data, now);
+    // A candidate moving stage in TA changes how deep the client's shortlist
+    // is, which is what the owner's two rules turn on (step 14).
+    if (event.type === "application.stage_changed") {
+      const opening = String(event.data.openingId ?? "");
+      const db2 = await desk();
+      const position = opening ? positionForOpening(db2, opening) : null;
+      if (position) await evaluateDepth(position.id, now);
+    }
     if (
       event.type === "opening.updated" ||
       event.type === "opening.jd_approved" ||

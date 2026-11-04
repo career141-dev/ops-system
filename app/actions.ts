@@ -27,6 +27,8 @@ import {
   patchIssue,
   patchPosition,
   patchRequirement,
+  evaluateDepth,
+  positionForSet,
   positionIn,
   requirementForLead,
   startReceiptClocks,
@@ -113,6 +115,7 @@ import {
 } from "@/lib/files";
 import { referenceFor } from "@/lib/mailMatch";
 import { problemWithCall, tidyPhone } from "@/lib/calls";
+import { HOLD_AT, problemWithAnotherSet } from "@/lib/depth";
 import { parseHolidayLines } from "@/lib/holidays";
 import { MEASURES } from "@/lib/baseline";
 import {
@@ -410,7 +413,15 @@ export async function approveAndSend(formData: FormData): Promise<void> {
     // Switched off on purpose is not the same as a send that went wrong. A
     // preview with no credentials would otherwise report every message as
     // failed, which hides the real failures when they come.
-    outcome.ok ? "sent" : sendingEnabled() ? "failed" : "blocked",
+    // A group post is never "sent": nobody sent it. It stops at approved,
+    // which is the truth - a person has it to post (3 Nov, in the browser).
+    message.channel === "group_post"
+      ? "approved"
+      : outcome.ok
+        ? "sent"
+        : sendingEnabled()
+          ? "failed"
+          : "blocked",
     verdict.to,
     said,
     outcome.providerMessageId,
@@ -1803,6 +1814,15 @@ export async function sendClientSet(formData: FormData): Promise<void> {
   const problem = problemWithSending(row.candidates, to, numberOf(db, "set.minCvs", MIN_CVS));
   if (problem) back(problem);
 
+  // The owner's hold at five (step 15): a client already sitting on five
+  // shortlisted gets no sixth CV, because that is how a client stops reading
+  // them. The ops lead can override it, and the override goes to the audit.
+  const held = problemWithAnotherSet(
+    positionForSet(db, row)?.depthStage ?? null,
+    numberOf(db, "depth.holdAt", HOLD_AT),
+  );
+  if (held && !can(member, "task.reassign")) back(held);
+
   const wording = templateFor(db, "set.cover");
   const fill = (text: string) =>
     text
@@ -1830,13 +1850,46 @@ export async function sendClientSet(formData: FormData): Promise<void> {
     { state: "sent", sentAt: now, sentMessageId: message.id, sentTo: to, receivedAt: now },
     member.id,
     "clientSet.sent",
-    null,
+    held ? "The ops lead sent it anyway: " + held : null,
   );
   await cancelClocksFor(db, "clientSet", setId, member.id, "The set has gone.", ["set.due"]);
   // Everything after a set counts from the day the client received it (step 6):
   // seven working days of CV ownership, the feedback chase, the two weeks before
   // a hold, and the three months before an unreported hire is asked about.
   await startReceiptClocks(db, { ...row, state: "sent", receivedAt: now }, now);
+
+  // The client's WhatsApp group (step 13). Nothing can post to a WhatsApp
+  // group - Meta's API cannot write to one - so the text is drafted and a
+  // person posts it from their phone. If the group does not exist yet, making
+  // it is the task the first set leaves behind.
+  const client = db.clients.find((c) => c.taClientId === row.clientTaId) ?? null;
+  const groupWording = templateFor(db, "set.group_post");
+  const post = await draftMessage({
+    channel: "group_post",
+    to: client?.groupName.trim() ? [client.groupName.trim()] : [],
+    subject: "",
+    body: fill(
+      groupWording?.body ?? "{{client}} > {{position}} > SET {{setNumber}}\n\n{{cvCount}} CVs are in your email.",
+    ),
+    templateKey: "set.group_post",
+    subjectType: "clientSet",
+    subjectId: setId,
+  });
+  if (!client?.groupName.trim()) {
+    await createTask({
+      kind: "check",
+      title: "Make the WhatsApp group: " + (client?.name ?? theirs?.name ?? row.name.split(" > ")[0]),
+      body:
+        "The first set has gone, so the group is made now and the set posted in it. The post is already drafted and waiting.\n\n" +
+        "Then write the group's name on the client's page, so the next set's post knows where it goes.",
+      assigneeId: row.ownerId,
+      dueAt: now,
+      subjectType: "clientSet",
+      subjectId: setId,
+      link: "/messages/" + post.id,
+    });
+  }
+
   await queueTaWrite(
     "/integrations/v1/client-sets/" + row.taRoundId + "/sent",
     { sentAt: now, receivedAt: now, sentTo: to },
@@ -1848,7 +1901,12 @@ export async function sendClientSet(formData: FormData): Promise<void> {
     "/messages/" +
       message.id +
       "?msg=" +
-      encodeURIComponent("The set is drafted with " + row.candidates.length + " CVs attached. Read it, then approve it."),
+      encodeURIComponent(
+        "The set is drafted with " +
+          row.candidates.length +
+          " CVs attached. Read it, then approve it. The group post is drafted too." +
+          (held ? " The hold at five was overridden." : ""),
+      ),
   );
 }
 
@@ -2054,9 +2112,18 @@ export async function recordClientDecision(formData: FormData): Promise<void> {
     { decision, reason, decidedAt: now, setId, roundId: row.taRoundId },
     { type: "clientSet", id: setId },
   );
+
+  // Every decision changes how deep the client's shortlist is, which is what
+  // the owner's two rules turn on (steps 14 and 15). It is counted here, from
+  // TA's own pipeline, rather than remembered by anybody.
+  const position = positionForSet(db, row);
+  const depth = position ? await evaluateDepth(position.id, now) : null;
+
   revalidatePath(here);
+  revalidatePath("/positions");
   back(
     "Recorded in their words, and the TA System will be told." +
+      (depth?.ok ? " " + depth.what : "") +
       (stopped ? " " + stopped + (stopped === 1 ? " clock" : " clocks") + " stopped: they have answered." : ""),
   );
 }
@@ -2444,6 +2511,10 @@ export async function handOverToTa(formData: FormData): Promise<void> {
     jdApprovedAt: null,
     linkedInUrl: null,
     linkedInPostedAt: null,
+    depthStage: null,
+    shortlistedTotal: null,
+    pendingCount: null,
+    depthCheckedAt: null,
     handedOverAt: now,
     closedAt: null,
     ownerId: row.ownerId,

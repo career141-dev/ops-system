@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { messageInWords, messageTitle } from "@/lib/messages";
 import { desk, draftsWaiting, liveTimersFor, openTasksFor, runClocks } from "@/data/desk";
 import { colomboDate, DAY } from "@/lib/calendar";
 import { timeLeft } from "@/lib/timers";
@@ -112,10 +113,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {drafts.map((message) => (
           <div key={message.id} className={row}>
             <div className="min-w-0 flex-1">
-              <p className="text-[13.5px]">{message.subject}</p>
-              <p className="mt-0.5 text-[12.5px] text-ink-soft">
-                {message.channel === "email" ? "Email" : message.channel} to {message.to.join(", ")}
-              </p>
+              <p className="text-[13.5px]">{messageTitle(message)}</p>
+              <p className="mt-0.5 text-[12.5px] text-ink-soft">{messageInWords(message)}</p>
             </div>
             <Link
               href={"/messages/" + message.id}

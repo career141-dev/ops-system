@@ -296,6 +296,6 @@ export function groupPostIsManual(): SendOutcome {
   return {
     ok: true,
     providerMessageId: null,
-    reason: "WhatsApp groups cannot be posted to by any system. Post this from your phone, then tick it off.",
+    reason: "Post it from your phone: no system can write to a WhatsApp group.",
   };
 }

@@ -564,6 +564,10 @@ export const addPosition = internalMutation({
     jdApprovedAt: v.union(v.number(), v.null()),
     linkedInUrl: v.union(v.string(), v.null()),
     linkedInPostedAt: v.union(v.number(), v.null()),
+    depthStage: v.union(v.string(), v.null()),
+    shortlistedTotal: v.union(v.number(), v.null()),
+    pendingCount: v.union(v.number(), v.null()),
+    depthCheckedAt: v.union(v.number(), v.null()),
     handedOverAt: v.number(),
     closedAt: v.union(v.number(), v.null()),
     ownerId: v.string(),
@@ -1240,7 +1244,8 @@ export const settleMessage = internalMutation({
   args: {
     messageId: v.string(),
     by: v.string(),
-    state: v.union(v.literal("sent"), v.literal("failed"), v.literal("blocked"), v.literal("queued")),
+    // "approved" is where a group post stops: a person posts it (3 Nov).
+    state: v.union(v.literal("sent"), v.literal("failed"), v.literal("blocked"), v.literal("queued"), v.literal("approved")),
     to: v.array(v.string()),
     note: v.union(v.string(), v.null()),
     /** What the mail server called it, once a sender knows. */
