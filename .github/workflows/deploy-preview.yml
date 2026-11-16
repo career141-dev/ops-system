@@ -44,7 +44,7 @@ jobs:
         run: |
           echo "::error::Preview deploys are switched off (repository variable PREVIEW_ENABLED is not 'true'). deploy/preview/README.md says what the server needs first."
           exit 1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -60,7 +60,7 @@ jobs:
     # The owner approves here. Set the environment up with a required reviewer.
     environment: ops-preview
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/login-action@v3
         with:
